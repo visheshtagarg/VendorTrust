@@ -1,4 +1,8 @@
 import json
+import os
+import shutil
+import time
+import uuid
 from pathlib import Path
 
 import streamlit as st
@@ -16,26 +20,26 @@ def _vendortrust_safe_dataframe(data, **kwargs):
         frame = frame.reset_index(drop=True)
     table_html = frame.to_html(index=not kwargs.get("hide_index", False), escape=True,
                                border=0, classes="vendortrust-html-table")
-    st.markdown(
-        """
-        <style>
-        .vendortrust-html-table {width:100%; border-collapse:collapse; font-size:0.88rem;}
-        .vendortrust-html-table th {background:#F1F5F9; color:#475569; font-weight:650;
-            text-align:left; padding:9px 11px; border:1px solid #DCE4EE;}
-        .vendortrust-html-table td {padding:9px 11px; border:1px solid #E2E8F0;
-            color:#172337; vertical-align:top;}
-        .vendortrust-html-table tr:nth-child(even) td {background:#F8FAFC;}
-        </style>
-        """ + table_html,
-        unsafe_allow_html=True,
+    # The HTML must start at column 0: Markdown treats lines indented by 4+
+    # spaces as a code block and would show the raw <table> tags as text.
+    style = (
+        "<style>"
+        ".vendortrust-html-table {width:100%; border-collapse:collapse; font-size:0.88rem;}"
+        ".vendortrust-html-table th {background:#F1F5F9; color:#475569; font-weight:650;"
+        " text-align:left; padding:9px 11px; border:1px solid #DCE4EE;}"
+        ".vendortrust-html-table td {padding:9px 11px; border:1px solid #E2E8F0;"
+        " color:#172337; vertical-align:top;}"
+        ".vendortrust-html-table tr:nth-child(even) td {background:#F8FAFC;}"
+        "</style>"
     )
+    st.markdown(style + "\n\n" + table_html, unsafe_allow_html=True)
 
 
 # Replace Streamlit's Arrow-backed dataframe renderer throughout this prototype.
 st.dataframe = _vendortrust_safe_dataframe
 
-from config import ROOT, UPLOADS, MAX_UPLOAD_MB, DB
-from database.connection import db, init_db
+from config import ROOT, DATA, UPLOADS, MAX_UPLOAD_MB, DB
+from database.connection import db, init_db, set_db_path
 from core.engine import (
     BANK_CHANGE_RULES, BLOCKING_STATUSES, DocumentError, UNRESOLVABLE_RULES, evaluate_profile, is_resolved,
 )
@@ -192,6 +196,10 @@ a { color: #1D4ED8 !important; }
 """, unsafe_allow_html=True)
 
 
+SESSIONS_DIR = DATA / "sessions"
+SESSION_MAX_IDLE_SECONDS = 6 * 60 * 60
+
+
 @st.cache_resource
 def _start_fresh():
     """Wipe saved data once per app start, so every launch begins empty.
@@ -199,7 +207,6 @@ def _start_fresh():
     st.cache_resource makes this run only once per server process. Streamlit
     reruns the script on every click, so without it data would be erased mid-demo.
     """
-    import shutil
     for suffix in ("", "-wal", "-shm"):
         Path(f"{DB}{suffix}").unlink(missing_ok=True)
     for item in UPLOADS.iterdir():
@@ -209,10 +216,34 @@ def _start_fresh():
             shutil.rmtree(item, ignore_errors=True)
         else:
             item.unlink(missing_ok=True)
+    shutil.rmtree(SESSIONS_DIR, ignore_errors=True)
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     return True
 
 
+def _remove_idle_sessions():
+    """Delete session folders nobody has used for a while, so the disk does not fill up."""
+    now = time.time()
+    for folder in SESSIONS_DIR.iterdir():
+        try:
+            if folder.is_dir() and now - folder.stat().st_mtime > SESSION_MAX_IDLE_SECONDS:
+                shutil.rmtree(folder, ignore_errors=True)
+        except FileNotFoundError:
+            pass
+
+
 _start_fresh()
+# Every browser session (new tab, page refresh) starts with its own empty
+# database and uploads folder. Data stays while that tab is in use and is never
+# visible to other viewers.
+if "vt_session_dir" not in st.session_state:
+    _remove_idle_sessions()
+    st.session_state["vt_session_dir"] = str(SESSIONS_DIR / uuid.uuid4().hex)
+SESSION_DIR = Path(st.session_state["vt_session_dir"])
+SESSION_UPLOADS = SESSION_DIR / "uploads"
+SESSION_UPLOADS.mkdir(parents=True, exist_ok=True)
+os.utime(SESSION_DIR)  # mark the session as active
+set_db_path(SESSION_DIR / "vendortrust.db")
 init_db()
 # Run legacy duplicate-request cleanup once per database, not on every Streamlit rerun.
 with db() as _connection:
@@ -368,7 +399,7 @@ elif page == "Bulk Upload":
                     if case_id.upper() in duplicates:
                         raise BulkError("Duplicate Case_ID in workbook. Each Case_ID must be unique within a batch.")
                     with db() as connection:  # one transaction per case
-                        results.append(process_bulk_case(connection, case, pdf_map, UPLOADS, MAX_UPLOAD_MB))
+                        results.append(process_bulk_case(connection, case, pdf_map, SESSION_UPLOADS, MAX_UPLOAD_MB))
                 except (BulkError, DocumentError, ValueError) as exc:
                     results.append({"Case_ID": case_id, "Result": "Error", "Error": str(exc)})
                 progress.progress(index / len(cases))
@@ -429,7 +460,7 @@ elif page == "New Onboarding":
             if prepared:
                 with db() as connection:
                     existing = find_vendor(connection, pan=profile["pan"])
-                    result = save_submission(connection, profile, prepared, existing, UPLOADS, source="ONLINE_FORM")
+                    result = save_submission(connection, profile, prepared, existing, SESSION_UPLOADS, source="ONLINE_FORM")
                 show_result(result)
 
 elif page == "Vendor Explorer":

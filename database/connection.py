@@ -1,10 +1,25 @@
 import sqlite3
+import threading
 from contextlib import contextmanager
 from config import DB, ROOT
 
+# Each Streamlit browser session gets its own database file. The app sets the
+# path at the start of every script run; anything else (tests, scripts) falls
+# back to the shared default DB.
+_local = threading.local()
+
+
+def set_db_path(path):
+    _local.path = path
+
+
+def current_db_path():
+    return getattr(_local, "path", None) or DB
+
+
 @contextmanager
 def db():
-    connection = sqlite3.connect(DB, timeout=30, check_same_thread=False)
+    connection = sqlite3.connect(current_db_path(), timeout=30, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA journal_mode=WAL")
@@ -19,7 +34,7 @@ def db():
 
 def connect():
     """Compatibility helper for existing modules."""
-    connection = sqlite3.connect(DB, timeout=30, check_same_thread=False)
+    connection = sqlite3.connect(current_db_path(), timeout=30, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA journal_mode=WAL")
