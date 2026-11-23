@@ -1,0 +1,32 @@
+{
+  "step1_original": {
+    "legal_name": "ABC INFRASTRUCTURE PVT LTD",
+    "pan": "ABCCA1234F",
+    "gstin": "07ABCCA1234F1Z8",
+    "email": "accounts@abcinfra.example.com",
+    "phone": "9876543210",
+    "address": "21 TEST MARKET, NEW DELHI, DELHI 110001",
+    "bank_account": "123456789012",
+    "ifsc": "HDFC0001234"
+  },
+  "step2a_bank_change_only": {
+    "legal_name": "ABC INFRASTRUCTURE PVT LTD",
+    "pan": "ABCCA1234F",
+    "gstin": "07ABCCA1234F1Z8",
+    "email": "accounts@abcinfra.example.com",
+    "phone": "9876543210",
+    "address": "21 TEST MARKET, NEW DELHI, DELHI 110001",
+    "bank_account": "987654321098",
+    "ifsc": "ICIC0000456"
+  },
+  "step2b_bank_and_contact_change": {
+    "legal_name": "ABC INFRASTRUCTURE PVT LTD",
+    "pan": "ABCCA1234F",
+    "gstin": "07ABCCA1234F1Z8",
+    "email": "accounts.newteam@abcinfra-payments.example.com",
+    "phone": "9123456780",
+    "address": "21 TEST MARKET, NEW DELHI, DELHI 110001",
+    "bank_account": "987654321098",
+    "ifsc": "ICIC0000456"
+  }
+}
