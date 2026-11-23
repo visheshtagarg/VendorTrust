@@ -1,0 +1,22 @@
+{
+  "vendor_A": {
+    "legal_name": "ABC INFRASTRUCTURE PVT LTD",
+    "pan": "ABCCA1234F",
+    "gstin": "07ABCCA1234F1Z8",
+    "email": "accounts@abcinfra.example.com",
+    "phone": "9876543210",
+    "address": "21 TEST MARKET, NEW DELHI, DELHI 110001",
+    "bank_account": "123456789012",
+    "ifsc": "HDFC0001234"
+  },
+  "vendor_B": {
+    "legal_name": "XYZ CONSULTANTS PVT LTD",
+    "pan": "XYZCT5678M",
+    "gstin": "27XYZCT5678M1ZZ",
+    "email": "billing@xyzconsult.example.com",
+    "phone": "9000011111",
+    "address": "5 HARBOUR ROAD, MUMBAI, MAHARASHTRA 400001",
+    "bank_account": "123456789012",
+    "ifsc": "HDFC0001234"
+  }
+}
